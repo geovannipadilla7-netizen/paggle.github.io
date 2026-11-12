@@ -1,0 +1,7 @@
+{
+  "name": "Paggle Access Restriction",
+  "description": "GoGuardian-style network access restriction interface with Paggle policy controls and access request workflow.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
