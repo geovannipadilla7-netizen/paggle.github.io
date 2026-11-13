@@ -28,7 +28,7 @@ interface NotificationState {
   generatedCode?: string;
 }
 
-type EmbeddedMode = 'default' | 'win11' | 'google';
+type EmbeddedMode = 'default' | 'win11' | 'duckduckgo';
 
 interface EmbeddedSession {
   mode: EmbeddedMode;
@@ -146,16 +146,16 @@ export default function App() {
         setIframeLoading(true);
         setIframeKey((prev) => prev + 1);
         setEmbeddedSession({
-          mode: 'google',
-          displayUrl: 'https://www.google.com/',
-          iframeSrc: 'https://www.google.com/webhp?igu=1',
-          title: 'Google'
+          mode: 'duckduckgo',
+          displayUrl: 'https://duckduckgo.com/',
+          iframeSrc: '/api/ddg',
+          title: 'DuckDuckGo'
         });
         setNotification({
           title: 'Access Override Granted',
-          message: 'Google Search has been unlocked and opened directly inside Paggle.',
+          message: 'DuckDuckGo has been unlocked and opened directly inside Paggle.',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          referenceId: 'GGL-' + Math.floor(100000 + Math.random() * 900000)
+          referenceId: 'DDG-' + Math.floor(100000 + Math.random() * 900000)
         });
       } else {
         // Display standard notification indicating request has been submitted
