@@ -16,7 +16,8 @@ import {
   AlertTriangle,
   HelpCircle,
   Copy,
-  Check
+  Check,
+  Monitor
 } from 'lucide-react';
 
 interface NotificationState {
@@ -24,10 +25,24 @@ interface NotificationState {
   message: string;
   timestamp: string;
   referenceId: string;
+  generatedCode?: string;
+}
+
+type EmbeddedMode = 'default' | 'win11' | 'google';
+
+interface EmbeddedSession {
+  mode: EmbeddedMode;
+  displayUrl: string;
+  iframeSrc: string;
+  title: string;
+  generatedCode?: string;
+  statusMessage?: string;
 }
 
 export default function App() {
-  const [isEmbeddedView, setIsEmbeddedView] = useState(false);
+  const [embeddedSession, setEmbeddedSession] = useState<EmbeddedSession | null>(null);
+  const [showWin11Banner, setShowWin11Banner] = useState(true);
+  const [copiedCode, setCopiedCode] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [reasonText, setReasonText] = useState('');
   const [studentEmail, setStudentEmail] = useState('student@district402.k12.org');
@@ -41,7 +56,7 @@ export default function App() {
 
   const targetBlockedUrl = 'http://Advocacylgbtq.b-cdn.net';
   // Use https for iframe if the parent page is https to prevent browser mixed-content blockage
-  const safeIframeUrl =
+  const safeAdvocacyUrl =
     typeof window !== 'undefined' && window.location.protocol === 'https:'
       ? 'https://Advocacylgbtq.b-cdn.net'
       : 'http://Advocacylgbtq.b-cdn.net';
@@ -69,6 +84,12 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isModalOpen]);
 
+  const generateWin11Code = () => {
+    const segment = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const digits = Math.floor(1000 + Math.random() * 9000);
+    return `WIN11-${segment}-${digits}`;
+  };
+
   const handleSubmitRequest = (e: React.FormEvent) => {
     e.preventDefault();
     if (!reasonText.trim()) return;
@@ -78,19 +99,63 @@ export default function App() {
     setTimeout(() => {
       setIsSubmitting(false);
       const normalizedReason = reasonText.trim();
-      const isOverridePhrase = normalizedReason.toLowerCase() === 'i got blocked';
+      const lowerReason = normalizedReason.toLowerCase();
 
-      if (isOverridePhrase) {
-        // Automatically open the embedded page as requested
+      if (lowerReason === 'i got blocked') {
         setIsModalOpen(false);
         setReasonText('');
-        setIsEmbeddedView(true);
         setIframeLoading(true);
+        setIframeKey((prev) => prev + 1);
+        setEmbeddedSession({
+          mode: 'default',
+          displayUrl: targetBlockedUrl,
+          iframeSrc: safeAdvocacyUrl,
+          title: 'Advocacylgbtq.b-cdn.net'
+        });
         setNotification({
           title: 'Access Override Granted',
           message: 'The requested link has been unlocked and opened directly in the page.',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           referenceId: 'OVR-' + Math.floor(100000 + Math.random() * 900000)
+        });
+      } else if (lowerReason === 'i love pizza') {
+        const runtimeCode = generateWin11Code();
+        setIsModalOpen(false);
+        setReasonText('');
+        setIframeLoading(true);
+        setShowWin11Banner(true);
+        setIframeKey((prev) => prev + 1);
+        setEmbeddedSession({
+          mode: 'win11',
+          displayUrl: 'https://win11.blueedge.me/',
+          iframeSrc: 'https://win11.blueedge.me/',
+          title: 'Windows 11 Desktop',
+          generatedCode: runtimeCode,
+          statusMessage: 'Windows 11 is running'
+        });
+        setNotification({
+          title: 'Windows 11 is running',
+          message: `Runtime environment initialized. Generated access code: ${runtimeCode}`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          referenceId: runtimeCode,
+          generatedCode: runtimeCode
+        });
+      } else if (lowerReason === 'get out') {
+        setIsModalOpen(false);
+        setReasonText('');
+        setIframeLoading(true);
+        setIframeKey((prev) => prev + 1);
+        setEmbeddedSession({
+          mode: 'google',
+          displayUrl: 'https://www.google.com/',
+          iframeSrc: 'https://www.google.com/webhp?igu=1',
+          title: 'Google'
+        });
+        setNotification({
+          title: 'Access Override Granted',
+          message: 'Google Search has been unlocked and opened directly inside Paggle.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          referenceId: 'GGL-' + Math.floor(100000 + Math.random() * 900000)
         });
       } else {
         // Display standard notification indicating request has been submitted
@@ -108,9 +173,16 @@ export default function App() {
   };
 
   const handleCopyUrl = () => {
-    navigator.clipboard?.writeText(targetBlockedUrl);
+    const urlToCopy = embeddedSession?.displayUrl ?? targetBlockedUrl;
+    navigator.clipboard?.writeText(urlToCopy);
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 2000);
+  };
+
+  const handleCopyCode = (code: string) => {
+    navigator.clipboard?.writeText(code);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
   };
 
   const toggleFullscreen = () => {
@@ -123,10 +195,22 @@ export default function App() {
     }
   };
 
+  const getProtocolAndHost = (url: string) => {
+    if (url.startsWith('https://')) {
+      return { protocol: 'https://', rest: url.slice('https://'.length) };
+    }
+    if (url.startsWith('http://')) {
+      return { protocol: 'http://', rest: url.slice('http://'.length) };
+    }
+    return { protocol: '', rest: url };
+  };
+
   // -------------------------------------------------------------------------
   // EMBEDDED PAGE VIEW (Unlocked state)
   // -------------------------------------------------------------------------
-  if (isEmbeddedView) {
+  if (embeddedSession) {
+    const { protocol, rest } = getProtocolAndHost(embeddedSession.displayUrl);
+
     return (
       <div
         ref={viewerContainerRef}
@@ -135,12 +219,12 @@ export default function App() {
         {/* Browser Chrome Navigation Header */}
         <header className="h-14 bg-slate-800 border-b border-slate-700/80 px-4 flex items-center justify-between gap-3 shrink-0 select-none shadow-md">
           {/* Left: Back to restriction screen */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => {
-                setIsEmbeddedView(false);
+                setEmbeddedSession(null);
               }}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white rounded-md transition-colors cursor-pointer shadow-sm active:scale-95"
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white rounded-md transition-colors cursor-pointer shadow-sm active:scale-95 whitespace-nowrap"
               title="Return to Access Restriction screen"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
@@ -159,20 +243,22 @@ export default function App() {
           </div>
 
           {/* Center: Address Bar Display */}
-          <div className="flex-1 max-w-2xl mx-auto flex items-center bg-slate-950/80 border border-slate-700 px-3 py-1.5 rounded-lg text-xs gap-2 text-slate-300 shadow-inner">
+          <div className="flex-1 max-w-2xl mx-auto flex items-center bg-slate-950/80 border border-slate-700 px-3 py-1.5 rounded-lg text-xs gap-2 text-slate-300 shadow-inner min-w-0">
             <Globe className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-            <span className="font-mono text-emerald-400 font-medium">http://</span>
+            {protocol && (
+              <span className="font-mono text-emerald-400 font-medium shrink-0">{protocol}</span>
+            )}
             <span className="font-mono truncate text-slate-200 selection:bg-blue-600">
-              Advocacylgbtq.b-cdn.net
+              {rest}
             </span>
-            <span className="ml-auto flex items-center gap-1.5 text-[10px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60 font-sans shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
-              Embedded Active
+            <span className="ml-auto flex items-center gap-1.5 text-[11px] text-slate-300 font-sans shrink-0">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Paggle Embedded</span>
             </span>
           </div>
 
           {/* Right: Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={handleCopyUrl}
               className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-md transition-colors cursor-pointer"
@@ -181,7 +267,7 @@ export default function App() {
               {copiedUrl ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
             </button>
             <a
-              href={targetBlockedUrl}
+              href={embeddedSession.displayUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-md transition-colors cursor-pointer"
@@ -199,23 +285,68 @@ export default function App() {
           </div>
         </header>
 
+        {/* Windows 11 Generated Code & Runtime Status Banner */}
+        {embeddedSession.mode === 'win11' && embeddedSession.generatedCode && showWin11Banner && (
+          <div className="bg-blue-950/95 border-b border-blue-800/80 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 rounded-md bg-blue-600/30 border border-blue-500/40 flex items-center justify-center text-blue-300 shrink-0">
+                <Monitor className="w-4 h-4" />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-white">Windows 11 is running</span>
+                <span className="text-blue-400" aria-hidden="true">·</span>
+                <span className="text-blue-200">Generated Code:</span>
+                <code className="font-mono font-semibold text-emerald-300 bg-slate-950/80 border border-blue-700/60 px-2.5 py-0.5 rounded select-all">
+                  {embeddedSession.generatedCode}
+                </code>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleCopyCode(embeddedSession.generatedCode!)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-blue-100 bg-blue-800/60 hover:bg-blue-700/80 border border-blue-600/50 rounded transition-colors cursor-pointer"
+              >
+                {copiedCode ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy Code</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setShowWin11Banner(false)}
+                className="p-1 text-blue-300 hover:text-white hover:bg-blue-800/50 rounded transition-colors cursor-pointer"
+                title="Hide status bar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Embedded Iframe Container */}
         <div className="relative flex-1 w-full bg-slate-950">
           {iframeLoading && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 z-10 text-slate-300 gap-3">
               <div className="w-8 h-8 border-3 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
-              <p className="text-xs text-slate-400 font-mono">Loading embedded resource...</p>
+              <p className="text-xs text-slate-400 font-mono">
+                Loading {embeddedSession.displayUrl}...
+              </p>
             </div>
           )}
 
           <iframe
-            key={iframeKey}
-            src={safeIframeUrl}
-            title="Embedded Site Content"
+            key={`${embeddedSession.mode}-${iframeKey}`}
+            src={embeddedSession.iframeSrc}
+            title={embeddedSession.title}
             className="w-full h-full border-0 bg-white"
             onLoad={() => setIframeLoading(false)}
             allow="accelerometer; autoplay; clipboard-read; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
           />
         </div>
       </div>
@@ -517,14 +648,6 @@ export default function App() {
                   />
                   <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
                     <span>Explain how this site supports educational or organizational objectives.</span>
-                    <button
-                      type="button"
-                      onClick={() => setReasonText('I got blocked')}
-                      className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
-                      title="Fill test phrase"
-                    >
-                      Fill "I got blocked"
-                    </button>
                   </div>
                 </div>
 
